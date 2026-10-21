@@ -1,0 +1,37 @@
+# Extra checks (see memcheck.sv). formal/run.sh replaces @repo@ and @rvf@.
+[tasks]
+imem
+dmem
+illegal
+
+[options]
+mode bmc
+imem: depth 16
+illegal: depth 16
+dmem: depth 10
+
+[engines]
+smtbmc yices
+
+[script]
+imem: read -define CHECK_IMEM
+dmem: read -define CHECK_DMEM
+illegal: read -define CHECK_ILLEGAL
+read -sv defines.sv rvfi_dmem_check.sv memcheck.sv
+plugin -i ghdl
+ghdl --std=08 -gFORMAL=true @repo@/src/ALU.vhd @repo@/src/ALU_decoder.vhd @repo@/src/Main_decoder.vhd @repo@/src/Imm_gen.vhd @repo@/src/Load_store_unit.vhd @repo@/src/Register_file.vhd @repo@/src/core.vhd -e rv32i_core
+prep -flatten -nordff -top memcheck
+chformal -early
+
+[files]
+@rvf@/checks/rvfi_macros.vh
+@rvf@/checks/rvfi_dmem_check.sv
+@repo@/formal/memcheck.sv
+
+[file defines.sv]
+`define RISCV_FORMAL
+`define RISCV_FORMAL_NRET 1
+`define RISCV_FORMAL_XLEN 32
+`define RISCV_FORMAL_ILEN 32
+`define RISCV_FORMAL_ALIGNED_MEM
+`include "rvfi_macros.vh"

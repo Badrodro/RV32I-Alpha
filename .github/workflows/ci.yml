@@ -1,11 +1,11 @@
-name: Simulation
+name: CI
 
 on:
   push:
   pull_request:
 
 jobs:
-  torture-test:
+  simulation:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -13,3 +13,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ghdl
       - name: Run the self-checking torture test
         run: ./scripts/sim.sh
+
+  formal:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Yosys, GHDL plugin, SymbiYosys and Yices
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ghdl ghdl-gcc yosys yosys-plugin-ghdl
+          git clone -q --depth 1 --branch yosys-0.33 https://github.com/YosysHQ/sby.git /tmp/sby
+          sudo make -C /tmp/sby install PREFIX=/usr/local
+          pip install --user --break-system-packages yices-solver
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: riscv-formal + memory-port checks
+        run: ./formal/run.sh
