@@ -127,6 +127,7 @@ signal regWE: std_logic;
 signal storeOK, loadReq: std_logic;
 signal memReq, memWait: std_logic; -- data memory request, not accepted yet
 signal retire: std_logic; -- the instruction in EX completes this cycle
+signal memHold: std_logic; -- a memory instruction is waiting (short path, for imem_en)
 
 begin
 
@@ -275,7 +276,12 @@ begin
 end process;
 
 ------------------------------------------------------------------ outputs
-imem_en <= not freeze;
+-- The instruction memory is disabled (its output held) whenever the core stalls. This is
+-- computed from the decoder and dmem_gnt only, not from the ALU (unlike freeze), so that the
+-- enable is ready early in the cycle (an ASIC SRAM can capture it on the falling edge). A
+-- trapping instruction may fetch one useless word: the core halts on the next edge anyway.
+memHold <= ex_live and ((d_isLoad and not load_wait) or (d_memWrite and not dmem_gnt));
+imem_en <= not (halted or memHold);
 imem_addr <= std_logic_vector(pc_if) & "00";
 
 dmem_en <= memReq;
