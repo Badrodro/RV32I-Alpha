@@ -2,76 +2,72 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
+-- Arithmetic and logic unit, controlled directly by funct3 (as encoded in RV32I):
+--   000 ADD/SUB  001 SLL  010 SLT  011 SLTU  100 XOR  101 SRL/SRA  110 OR  111 AND
+--
+-- Area: one 33-bit adder serves ADD, SUB, SLT, SLTU and the branch comparisons, and
+-- one right shifter serves SRL, SRA and SLL (SLL = reverse, shift right, reverse).
+-- Timing: equality is compared directly on the operands, in parallel with the adder,
+-- instead of testing the adder output for zero (BEQ/BNE no longer wait for the carry).
 
 entity ALU is
-    Port ( 
-    source1: in unsigned(31 downto 0);
-    source2: in unsigned(31 downto 0);
-    aluOP: in std_logic_vector(3 downto 0); -- used to select which operation the ALU need to make
-    
-    aluResult: out std_logic_vector(31 downto 0); -- output result from the ALU
-    zero: out std_logic -- Zero FLAG
-    
+    Port (
+    a: in std_logic_vector(31 downto 0);
+    b: in std_logic_vector(31 downto 0);
+    fn: in std_logic_vector(2 downto 0); -- operation (funct3 encoding, see above)
+    sub: in std_logic; -- '1': ADD becomes SUB (SLT and SLTU always subtract)
+    arith: in std_logic; -- '1': SRL becomes SRA
+
+    result: out std_logic_vector(31 downto 0);
+    lt: out std_logic; -- a < b, signed for fn = 010, unsigned for fn = 011
+    eq: out std_logic -- a = b
     );
 end ALU;
 
 architecture Behavioral of ALU is
 
-signal s_result: unsigned(31 downto 0);
+function reverse(x: std_logic_vector(31 downto 0)) return std_logic_vector is
+    variable r: std_logic_vector(31 downto 0);
+begin
+    for i in 0 to 31 loop
+        r(i) := x(31 - i);
+    end loop;
+    return r;
+end function;
+
+signal doSub, sgn: std_logic;
+signal opA, opB: unsigned(33 downto 0);
+signal sum: unsigned(33 downto 0);
+signal left: std_logic;
+signal shIn, shOut: std_logic_vector(31 downto 0);
+signal shRes: signed(32 downto 0);
 
 begin
 
-process(source1,source2,aluOP)
+-- adder: a 33-bit subtraction never overflows, so bit 32 is the sign of a - b,
+-- i.e. a < b, once both operands are extended with their sign (SLT) or a zero (SLTU).
+-- The extra bit at the bottom turns "+ doSub" into the carry-in of a single adder.
+doSub <= sub or (not fn(2) and fn(1)); -- SUB, SLT, SLTU
+sgn <= not fn(0); -- signed comparison for SLT (and BLT/BGE), unsigned for SLTU
+opA <= unsigned((a(31) and sgn) & a & '1');
+opB <= unsigned(((b(31) and sgn) & b & doSub) xor (33 downto 1 => doSub) & '0');
+sum <= opA + opB;
+lt <= sum(33);
 
-variable distance: integer;-- distance need to be an integer because the function shit_left/right takes only integer
+eq <= '1' when a = b else '0';
 
-begin
-    distance := to_integer(source2(4 downto 0));
-    case aluOP is 
-        when "0000" => -- ADD operation
-            s_result <= source1 + source2;
-            
-        when "0001" => -- SUB operation
-            s_result <= source1 - source2;
-            
-        when "0010" => -- AND operation
-            s_result <= source1 and source2;
-            
-        when "0011" => -- OR operation
-            s_result <= source1 or source2;
-            
-        when "0100" => -- XOR operation
-            s_result <= source1 xor source2;
-            
-        when "0101" => -- SLL (shift left logical) where source1 is left-shifted by the 5 LSB of source2 (5 because source1 is 32 bits long)
-            s_result <= shift_left(source1,distance);
-            
-        when "0110" => -- SRL (shift right logical) where source1 is right-shifted by the 5 LSB of source2
-            s_result <= shift_right(source1,distance);
-            
-        when "0111" => -- SRA (shift right arithmetic) source1 is signed, the value will depend on the MSB, if the MSB is 1 we fill empty spaces with 1s otherwise with 0s. ex: 100, ASR >> 1 will give 110 and with ASR 2>> will give 111
-            s_result <= unsigned(shift_right(signed(source1),distance));
-            
-        when  "1000" => -- SLT (set less than)
-            if signed(source1) < signed(source2) then
-                s_result <= to_unsigned(1,32); -- the value '1' in 32 bit-long bus target (000...1)
-            else
-                s_result <= (others => '0');
-            end if;
-            
-         when "1001" => --SLTU((set less than unsigned)
-            if source1 < source2 then
-                s_result <= to_unsigned(1,32);
-            else
-                s_result <= (others => '0');
-            end if;
-            
-         when others =>
-                s_result <= (others => '0');
-         end case;
-end process;
-                
-aluResult <= std_logic_vector(s_result);             
-zero <= '1' when unsigned(s_result) = 0 else '0';             
-                
+-- shifter
+left <= '1' when fn(2) = '0' and fn(0) = '1' else '0'; -- 001: SLL
+shIn <= reverse(a) when left = '1' else a;
+shRes <= shift_right(signed((arith and a(31) and not left) & shIn), to_integer(unsigned(b(4 downto 0))));
+shOut <= reverse(std_logic_vector(shRes(31 downto 0))) when left = '1' else std_logic_vector(shRes(31 downto 0));
+
+with fn select result <=
+    std_logic_vector(sum(32 downto 1)) when "000",
+    shOut when "001" | "101",
+    (31 downto 1 => '0') & sum(33) when "010" | "011",
+    a xor b when "100",
+    a or b when "110",
+    a and b when others;
+
 end Behavioral;

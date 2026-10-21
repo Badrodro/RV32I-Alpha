@@ -13,9 +13,9 @@ entity Main_decoder is
         regWrite: out std_logic; -- the instruction writes rd
         immType: out std_logic_vector (2 downto 0); -- format of the immediate (see Imm_gen)
         aluSrc: out std_logic; -- second ALU operand: '0' rs2, '1' immediate
-        aluSrcA: out std_logic_vector(1 downto 0); -- first ALU operand: "00" rs1, "01" PC (AUIPC), "10" zero (LUI)
+        zeroA: out std_logic; -- first ALU operand: '0' rs1, '1' zero (LUI)
         memWrite: out std_logic; -- store
-        resultSrc: out std_logic_vector(1 downto 0); -- value written to rd: "00" ALU, "01" load data, "10" PC + 4
+        resultSrc: out std_logic_vector(1 downto 0); -- value written to rd: "00" ALU, "01" load data, "10" PC + 4, "11" PC + imm (AUIPC)
         aluOP: out std_logic_vector(1 downto 0); -- class of ALU operation, refined by the ALU decoder
         branch: out std_logic; -- conditional branch
         isLoad: out std_logic; -- load (the data memory is synchronous: 2 cycles)
@@ -40,7 +40,7 @@ begin
     regWrite <= '0';
     immType <= "000";
     aluSrc <= '0';
-    aluSrcA <= "00";
+    zeroA <= '0';
     memWrite <= '0';
     resultSrc <= "00";
     aluOP <= "00";
@@ -119,15 +119,13 @@ begin
             regWrite <= '1';
             immType <= "100";
             aluSrc <= '1';
-            aluSrcA <= "10";
+            zeroA <= '1';
             aluOP <= "10";
 
-        when "0010111" => -- AUIPC: rd = PC + imm
+        when "0010111" => -- AUIPC: rd = PC + imm, computed by the jump target adder
             regWrite <= '1';
             immType <= "100";
-            aluSrc <= '1';
-            aluSrcA <= "01";
-            aluOP <= "10";
+            resultSrc <= "11";
 
         when "0001111" => -- FENCE: NOP (FENCE.I is not part of RV32I)
             if funct3 /= "000" then

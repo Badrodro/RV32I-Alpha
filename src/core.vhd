@@ -102,12 +102,14 @@ signal rs1, rs2, rd: std_logic_vector(4 downto 0);
 -- decoder
 signal d_regWrite, d_aluSrc, d_memWrite, d_branch, d_jump, d_jalr, d_isLoad, d_trap: std_logic;
 signal d_immType: std_logic_vector(2 downto 0);
-signal d_resultSrc, d_aluSrcA, d_aluOP: std_logic_vector(1 downto 0);
-signal aluCtrl: std_logic_vector(3 downto 0);
+signal d_zeroA: std_logic;
+signal d_resultSrc, d_aluOP: std_logic_vector(1 downto 0);
+signal aluFn: std_logic_vector(2 downto 0);
+signal aluSub, aluArith: std_logic;
 
 -- datapath
 signal imm, data1, data2, src1, src2, aluResult, loadData, resultWB: std_logic_vector(31 downto 0);
-signal zero: std_logic;
+signal lt, eq: std_logic;
 signal pcBase, pcTarget, linkAddr, pcNextEx: std_logic_vector(31 downto 0);
 signal laneMask: std_logic_vector(3 downto 0);
 signal storeWord: std_logic_vector(31 downto 0); -- store data placed on the byte lanes
@@ -139,7 +141,7 @@ dec_inst: entity work.Main_decoder port map(
     regWrite => d_regWrite,
     immType => d_immType,
     aluSrc => d_aluSrc,
-    aluSrcA => d_aluSrcA,
+    zeroA => d_zeroA,
     memWrite => d_memWrite,
     resultSrc => d_resultSrc,
     aluOP => d_aluOP,
@@ -154,7 +156,9 @@ aludec_inst: entity work.ALU_decoder port map(
     aluOP => d_aluOP,
     funct3 => instr(14 downto 12),
     funct7_5 => instr(30),
-    aluOUT => aluCtrl
+    fn => aluFn,
+    sub => aluSub,
+    arith => aluArith
     );
 
 imm_inst: entity work.Imm_gen port map(
@@ -175,27 +179,28 @@ rf_inst: entity work.Register_file port map(
     data2 => data2
     );
 
-src1 <= std_logic_vector(pc_ex) & "00" when d_aluSrcA = "01" else -- AUIPC
-        (others => '0') when d_aluSrcA = "10" else -- LUI
-        data1;
+src1 <= (others => '0') when d_zeroA = '1' else data1; -- LUI: 0 + imm
 src2 <= imm when d_aluSrc = '1' else data2;
 
 alu_inst: entity work.ALU port map(
-    source1 => unsigned(src1),
-    source2 => unsigned(src2),
-    aluOP => aluCtrl,
-    aluResult => aluResult,
-    zero => zero
+    a => src1,
+    b => src2,
+    fn => aluFn,
+    sub => aluSub,
+    arith => aluArith,
+    result => aluResult,
+    lt => lt,
+    eq => eq
     );
 
--- branch decision: the ALU computes SUB (BEQ/BNE), SLT (BLT/BGE) or SLTU (BLTU/BGEU)
--- funct3(2) = '0' -> equality (zero flag), '1' -> comparison result; funct3(0) = '1' -> inverted
-branchCond <= zero when instr(14) = '0' else aluResult(0);
+-- branch decision: funct3(2) = '0' -> equality (BEQ/BNE), '1' -> less than (BLT/BGE signed,
+-- BLTU/BGEU unsigned: the ALU decoder selects SLT or SLTU); funct3(0) = '1' -> inverted
+branchCond <= eq when instr(14) = '0' else lt;
 branchTaken <= branchCond xor instr(12);
 takeTarget <= d_jump or (d_branch and branchTaken);
 
 pcBase <= data1 when d_jalr = '1' else std_logic_vector(pc_ex) & "00";
-pcTarget <= std_logic_vector(unsigned(pcBase) + unsigned(imm)) and x"FFFFFFFE"; -- JALR clears bit 0
+pcTarget <= std_logic_vector(unsigned(pcBase) + unsigned(imm)) and x"FFFFFFFE"; -- JALR clears bit 0; also AUIPC
 linkAddr <= std_logic_vector(pc_if) & "00"; -- PC + 4: while EX is valid, pc_if = pc_ex + 4
 pcNextEx <= pcTarget when takeTarget = '1' else linkAddr;
 
@@ -213,6 +218,7 @@ lsu_inst: entity work.Load_store_unit port map(
 with d_resultSrc select resultWB <=
     loadData when "01",
     linkAddr when "10",
+    pcTarget when "11",
     aluResult when others;
 
 ------------------------------------------------------------------ control
