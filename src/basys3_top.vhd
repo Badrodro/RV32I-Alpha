@@ -53,6 +53,7 @@ core_inst: entity work.rv32i_core
         dmem_addr => dmem_addr,
         dmem_wdata => dmem_wdata,
         dmem_rdata => dmem_rdata,
+        dmem_gnt => '1', -- the BRAM answers every request
         trap => trap,
         wb_valid => wb_valid,
         wb_data => wb_data,

@@ -23,8 +23,10 @@
 --
 -- Memories (outside the core):
 --   imem: data valid one clock after (imem_en, imem_addr), output held while imem_en = '0'.
---   dmem: same timing, one write enable per byte. Read data is used one cycle after
---         the request.
+--   dmem: request (dmem_en, dmem_we, dmem_addr, dmem_wdata) held until dmem_gnt = '1';
+--         read data valid in the cycle after the grant. One write enable per byte.
+--         Tie dmem_gnt to '1' for a plain synchronous SRAM; an arbiter or a slower
+--         memory can insert wait states (dmem_gnt should come from registers).
 ----------------------------------------------------------------------------------
 
 library IEEE;
@@ -51,6 +53,7 @@ entity rv32i_core is
         dmem_addr: out std_logic_vector(31 downto 0);
         dmem_wdata: out std_logic_vector(31 downto 0);
         dmem_rdata: in std_logic_vector(31 downto 0);
+        dmem_gnt: in std_logic; -- the memory accepts the request this cycle
 
         trap: out std_logic; -- the core has halted
 
@@ -120,6 +123,7 @@ signal freeze: std_logic; -- nothing moves in the pipeline this cycle
 signal redirect: std_logic; -- jump or taken branch: restart the fetch at the target
 signal regWE: std_logic;
 signal storeOK, loadReq: std_logic;
+signal memReq, memWait: std_logic; -- data memory request, not accepted yet
 signal retire: std_logic; -- the instruction in EX completes this cycle
 
 begin
@@ -218,14 +222,17 @@ memMisaligned <= (d_isLoad or d_memWrite) and misaligned;
 pcMisaligned <= takeTarget and pcTarget(1); -- no compressed instructions: targets are multiples of 4
 trapNow <= ex_live and (d_trap or memMisaligned or pcMisaligned);
 
-stall <= ex_live and d_isLoad and not load_wait and not trapNow;
+-- a load waits for its grant, then for its data (load_wait); a store waits for its grant
+loadReq <= ex_live and d_isLoad and not load_wait and not trapNow;
+storeOK <= ex_live and d_memWrite and not trapNow;
+memReq <= loadReq or storeOK;
+memWait <= memReq and not dmem_gnt;
+stall <= loadReq or memWait;
 freeze <= halted or trapNow or stall;
 redirect <= ex_live and takeTarget and not trapNow;
 retire <= ex_live and not stall;
 
 regWE <= ex_live and d_regWrite and not trapNow and not stall;
-storeOK <= ex_live and d_memWrite and not trapNow;
-loadReq <= stall; -- the read is issued in the first cycle of the load
 
 process(clk, rst)
 begin
@@ -235,7 +242,7 @@ begin
         load_wait <= '0';
         halted <= '0';
     elsif rising_edge(clk) then
-        load_wait <= stall;
+        load_wait <= loadReq and dmem_gnt;
         if trapNow = '1' then
             halted <= '1';
         end if;
@@ -265,7 +272,7 @@ end process;
 imem_en <= not freeze;
 imem_addr <= std_logic_vector(pc_if) & "00";
 
-dmem_en <= storeOK or loadReq;
+dmem_en <= memReq;
 dmem_we <= laneMask when storeOK = '1' else "0000";
 dmem_addr <= aluResult;
 dmem_wdata <= storeWord;

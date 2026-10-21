@@ -8,6 +8,7 @@
 //             returned for address A (symbolic A and symbolic word).
 //   dmem    : a load from address A returns the last bytes stored to A, through the
 //             real dmem port (riscv-formal's rvfi_dmem_check + a one-word memory model).
+//   (all)   : a request the memory did not grant is repeated unchanged.
 //   illegal : every 32-bit word that is not an RV32I instruction traps without side
 //             effects; FENCE is a NOP; ECALL / EBREAK trap. The reference decoder below
 //             is written independently of src/Main_decoder.vhd.
@@ -36,6 +37,7 @@ module memcheck (
 
 	`rvformal_rand_reg [31:0] imem_rand;
 	`rvformal_rand_reg [31:0] dmem_rand;
+	`rvformal_rand_reg        dmem_gnt;   // wait states: any pattern
 
 	// symbolic instruction word at a symbolic (word-aligned) address
 	`rvformal_rand_const_reg [31:0] sym_pc;
@@ -51,7 +53,7 @@ module memcheck (
 	wire [31:0] sym_daddr;
 	reg  [31:0] dword;
 	always @(posedge clock) begin
-		if (dmem_en) begin
+		if (dmem_en && dmem_gnt) begin
 			if (dmem_addr[31:2] == sym_daddr[31:2]) begin
 				dmem_rdata <= dword;
 				if (dmem_we[0]) dword[ 7: 0] <= dmem_wdata[ 7: 0];
@@ -76,6 +78,7 @@ module memcheck (
 		.dmem_addr  (dmem_addr),
 		.dmem_wdata (dmem_wdata),
 		.dmem_rdata (dmem_rdata),
+		.dmem_gnt   (dmem_gnt),
 		.trap       (trap),
 		.wb_valid   (wb_valid),
 		.wb_data    (wb_data),
@@ -149,11 +152,23 @@ module memcheck (
 	end
 `endif
 
-	// ---- port hygiene (always on) ----------------------------------------------------
+	// ---- port protocol (always on) ---------------------------------------------------
+	// a request that was not granted is repeated unchanged in the next cycle
+	reg        waiting = 0;
+	reg [31:0] w_addr, w_wdata;
+	reg [ 3:0] w_we;
+	always @(posedge clock) begin
+		waiting <= !reset && dmem_en && !dmem_gnt;
+		w_addr <= dmem_addr; w_we <= dmem_we; w_wdata <= dmem_wdata;
+	end
 	always @* begin
 		if (!reset) begin
 			assert (imem_addr[1:0] == 2'b00);
 			if (dmem_we != 4'b0000) assert (dmem_en);
+			if (waiting) begin
+				assert (dmem_en && dmem_addr == w_addr && dmem_we == w_we);
+				if (w_we != 4'b0000) assert (dmem_wdata == w_wdata);
+			end
 		end
 	end
 endmodule
