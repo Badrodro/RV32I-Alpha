@@ -21,6 +21,8 @@ The core implements the **RV32I Base Integer Instruction Set**.
 | **Worst Negative Slack** | **0.165 ns** | **Timing Met @ 100 MHz** |
 | **Maximum Frequency** | **101.7 MHz** | *--* |
 
+> **Note:** these figures were measured before the core gained all six branch conditions, a correct `LUI`/`AUIPC`, byte/half-word loads and stores, and a larger ROM (256 words) holding the new self-checking test. They have to be regenerated with Vivado and will be somewhat higher.
+
 ---
 
 ## Comparison with Selected Open-Source RV32I Cores
@@ -52,17 +54,22 @@ To maintain very low resource usage, the core uses a dedicated stall mechanism t
 
 ## Verification
 
-Verification currently relies on a full-core simulation testbench and a ROM-resident torture test program designed to stress the main execution paths of the processor.
+Verification relies on a full-core simulation testbench and a self-checking, ROM-resident torture test program. Each check jumps to a `fail` label on a wrong result, and the program always ends with `ebreak`. The instruction just before `ebreak` writes the verdict in `x31` (1 = pass, otherwise the number of the failed test). The testbench reads it on `testOUT` when `TRAP` rises and reports **SUCCESS** or the failed test number.
 
-Validated aspects include:
-- arithmetic and logical RV32I instructions
-- branch and control-flow behavior
-- load/store execution
-- trap-based program termination (`ebreak`, `ecall`)
-- stall behavior related to synchronous memory accesses
+Covered by the test:
+- `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, `BGEU` (taken and not taken, equal operands)
+- `LUI` and `AUIPC`
+- all R-type and I-type ALU instructions, writes to `x0`
+- `JAL` and `JALR` (including clearing bit 0 of the target)
+- `LW`, `LH`, `LHU`, `LB`, `LBU`, `SW`, `SH`, `SB`, back-to-back loads and use of a value right after its load
+- trap-based program termination (`ebreak`)
 
 Main program used for end-to-end validation:
 - [torture_test](asm/torture_test.s)
+
+After editing the program, regenerate the ROM contents with `python3 asm/build_rom.py` (needs LLVM: `llvm-mc` and `llvm-objcopy`).
+
+Not supported yet: misaligned loads/stores (they do not trap), `FENCE` is executed as a NOP, and there are no CSRs.
 
 More advanced verification methods such as formal verification and finer-grain block-level testbenches are planned as future work.
 

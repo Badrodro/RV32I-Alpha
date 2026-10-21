@@ -35,20 +35,30 @@ begin
 
     -- 5. Intelligent Stimulus Process
     stim_proc: process
+        variable last_wb : std_logic_vector(31 downto 0) := (others => '0');
     begin        
         -- Initial reset sequence
         reset_tb <= '1';
         wait for 25 ns;
         reset_tb <= '0';
 
-        -- Synchronization: wait for a system event (trap signal)
-        -- This event-driven approach is preferred for research-grade verification
-        wait until trap_tb = '1' for 2000 ns; 
+        -- The test program ends with an ebreak (TRAP). The instruction just before it
+        -- writes the verdict in x31: 1 = pass, otherwise the number of the failed test.
+        -- testOUT shows the write-back bus, so we keep the last value seen before TRAP.
+        -- Signals are sampled on the clock edge, i.e. the value of the instruction
+        -- that has just finished.
+        for cycle in 0 to 2000 loop
+            wait until rising_edge(clk_tb);
+            exit when trap_tb = '1';
+            last_wb := testOUT_tb;
+        end loop;
 
-        if trap_tb = '1' then
-            assert false report "SUCCESS: SYSTEM instruction detected (ecall/ebreak). Clean program termination." severity note;
+        if trap_tb /= '1' then
+            assert false report "ERROR: Simulation timeout! The processor never reached ebreak/ecall." severity failure;
+        elsif unsigned(last_wb) = 1 then
+            report "SUCCESS: all checks of the torture test passed." severity note;
         else
-            assert false report "ERROR: Simulation timeout! The processor failed to assert the TRAP signal." severity failure;
+            assert false report "ERROR: torture test failed at test number " & integer'image(to_integer(unsigned(last_wb))) severity failure;
         end if;
 
         -- Stop simulation

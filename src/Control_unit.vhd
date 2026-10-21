@@ -15,6 +15,7 @@ entity Control_unit is
         -- outputs of maindecoder
         regWrite: out std_logic; -- write in register authorization ( ONLY IN REGISTER )
         immType: out std_logic_vector (2 downto 0); -- 3 bits to select the TYPE of the immediate
+        aluSrcA: out std_logic_vector(1 downto 0); -- first ALU operand: rs1, PC or zero
         aluSrc: out std_logic; -- '0' we take the output of the second register, '1' we take the immediate (multiplexer before the ALU) //  either rs1+ rs2 or rs1 + imm (imm is a constant)
         memWrite: out std_logic; --  write in RAM or not
         resultSrc: out std_logic_vector(1 downto 0); -- what we will stock in register( either the result of the ALU, or a data from the RAM or the return adress)
@@ -67,6 +68,7 @@ mainDecoder: entity work.Main_decoder port map (
     regWrite => s_regWrite,
     immType => immType,
     aluSrc => aluSrc,
+    aluSrcA => aluSrcA,
     memWrite => s_memWrite,
     resultSrc => resultSrc,
     branch => branch,

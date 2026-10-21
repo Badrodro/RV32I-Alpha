@@ -66,8 +66,15 @@ begin
          when "10" =>
             aluOUT <= "0000";
             
-         when "11" => 
-            aluOUT <= "0001"; -- forced sub for branch
+         when "11" => -- branch: reuse the ALU comparators, the condition is finished in top
+            case funct3(2 downto 1) is
+                when "10" =>
+                    aluOUT <= "1000"; -- BLT / BGE use SLT
+                when "11" =>
+                    aluOUT <= "1001"; -- BLTU / BGEU use SLTU
+                when others =>
+                    aluOUT <= "0001"; -- BEQ / BNE use SUB and the zero flag
+            end case;
          when others =>
             aluOUT <= "0000";
      end case;

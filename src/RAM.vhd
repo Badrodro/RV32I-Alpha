@@ -6,7 +6,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity RAM is
     Port (
     clk: in std_logic;
-    we: in std_logic;
+    we: in std_logic_vector(3 downto 0); -- one write enable per byte (SB / SH / SW)
     addr: in std_logic_vector(31 downto 0); -- the adress where we want to write/read
     
     dataIN: in std_logic_vector(31 downto 0); -- the data we want to write
@@ -26,9 +26,11 @@ begin
 process(clk)
 begin
     if rising_edge(clk) then
-        if we = '1' then
-            s_ram(to_integer(unsigned(addr(11 downto 2)))) <= dataIN;
-        end if;
+        for i in 0 to 3 loop -- byte-write template, inferred as a single BRAM by Vivado
+            if we(i) = '1' then
+                s_ram(to_integer(unsigned(addr(11 downto 2))))(8*i+7 downto 8*i) <= dataIN(8*i+7 downto 8*i);
+            end if;
+        end loop;
         dataOUT <= s_ram(to_integer(unsigned(addr(11 downto 2))));
     end if;
 end process;

@@ -10,6 +10,7 @@ entity Main_decoder is
         regWrite: out std_logic; -- write in register authorization ( ONLY IN REGISTER )
         immType: out std_logic_vector (2 downto 0); -- 3 bits to select the TYPE of the immediate
         aluSrc: out std_logic; -- '0' we take the output of the second register, '1' we take the immediate (multiplexer before the ALU) //  either rs1+ rs2 or rs1 + imm (imm is a constant)
+        aluSrcA: out std_logic_vector(1 downto 0); -- first ALU operand: "00" rs1, "01" PC (AUIPC), "10" zero (LUI)
         memWrite: out std_logic; --  write in RAM or not
         resultSrc: out std_logic_vector(1 downto 0); -- what we will stock in register ( either the result of the ALU, or a data from the RAM or the return adress)
         aluOP: out std_logic_vector(1 downto 0); -- code sent to the ALU_decoder module
@@ -31,6 +32,7 @@ begin
     regWrite <= '0';
     immType <= "000";
     aluSrc <= '0';
+    aluSrcA <= "00";
     memWrite <= '0';
     resultSrc <= "00";
     aluOP <= "00";
@@ -98,7 +100,7 @@ begin
             aluSrc <= '0';
             memWrite <= '0';
             resultSrc <= "XX"; -- don't care 
-            aluOP <= "11"; -- forced substraction
+            aluOP <= "11"; -- comparison selected by funct3 in the ALU decoder
             branch <= '1';
             jump <= '0';
             isLoad <= '0';
@@ -135,6 +137,7 @@ begin
             regWrite <= '1';
             immType <= "100";
             aluSrc <= '1';
+            aluSrcA <= "10"; -- rd = 0 + imm (bits 19:15 are part of the immediate, not rs1)
             memWrite <= '0';
             resultSrc <= "00";
             aluOP <= "10";  
@@ -148,6 +151,7 @@ begin
             regWrite <= '1';
             immType <= "100";
             aluSrc <= '1';
+            aluSrcA <= "01"; -- rd = PC + imm
             memWrite <= '0';
             resultSrc <= "00";
             aluOP <= "10";
@@ -169,7 +173,7 @@ begin
             jalr <= '0';
             trap <= '1';
             
-        when others =>
+        when others => -- includes FENCE, executed as a NOP (single hart, no cache)
             regWrite <= '0';
             immType <= "XXX";
             aluSrc <= '0';
