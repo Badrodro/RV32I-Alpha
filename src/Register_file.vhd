@@ -21,7 +21,7 @@ end Register_file;
 
 architecture Behavioral of Register_file is
     type ram_type is array (0 to 31) of std_logic_vector(31 downto 0);
-    signal regs: ram_type := (others => (others => '0')); -- same as the FPGA power-up state
+    signal regs: ram_type; -- not reset (software must write a register before reading it)
 
 begin
 

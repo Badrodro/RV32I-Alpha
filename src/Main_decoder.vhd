@@ -44,7 +44,6 @@ begin
     case opcode is    
         when "0110011" => -- R-type
             regWrite <= '1';
-            immType <= "XXX"; -- no immediate
             aluSrc <= '0'; -- only two registers operation
             memWrite <= '0';
             resultSrc <= "00"; -- result of the ALU
@@ -86,7 +85,6 @@ begin
             immType <= "010"; -- store-type immediate
             aluSrc <= '1';
             memWrite <= '1'; -- write in RAM
-            resultSrc <= "XX";
             aluOP <= "10";
             branch <= '0';
             jump <= '0';
@@ -99,7 +97,6 @@ begin
             immType <= "011"; -- b-type
             aluSrc <= '0';
             memWrite <= '0';
-            resultSrc <= "XX"; -- don't care 
             aluOP <= "11"; -- comparison selected by funct3 in the ALU decoder
             branch <= '1';
             jump <= '0';
@@ -110,10 +107,8 @@ begin
         when "1101111" => -- JAL instruction
             regWrite <= '1';
             immType <= "101"; -- j-type
-            aluSrc <= 'X';
             memWrite <= '0';
             resultSrc <= "10"; -- the return address is saved
-            aluOP <= "XX"; -- the operation is made in another adder
             branch <= '0';
             jump <= '1';
             isLoad <= '0';
@@ -162,11 +157,8 @@ begin
             
         when "1110011" => -- SYSTEM instruction
             regWrite <= '0';
-            immType <= "XXX";
             aluSrc <= '0';
             memWrite <= '0';
-            resultSrc <= "XX";
-            aluOP <= "XX";
             branch <= '0';
             jump <= '0';
             isLoad <= '0';
@@ -175,10 +167,8 @@ begin
             
         when others => -- includes FENCE, executed as a NOP (single hart, no cache)
             regWrite <= '0';
-            immType <= "XXX";
             aluSrc <= '0';
             memWrite <= '0';
-            resultSrc <= "XX";
             aluOP <= "00";
             branch <= '0';
             jump <= '0';

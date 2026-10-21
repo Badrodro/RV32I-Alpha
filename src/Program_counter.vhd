@@ -16,7 +16,7 @@ entity Program_counter is
 end Program_counter;
 
 architecture Behavioral of Program_counter is
-    signal s_pcOUT: unsigned(31 downto 0) := (others => '0');
+    signal s_pcOUT: unsigned(31 downto 0);
     
 begin
 

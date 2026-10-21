@@ -19,7 +19,7 @@ end RAM;
 
 architecture Behavioral of RAM is
 type ram_type is array (0 to 1023) of std_logic_vector(31 downto 0);
-signal s_ram: ram_type := (others =>(others => '0'));
+signal s_ram: ram_type; -- no initial value: SRAM macros and formal tools start from an unknown state
 begin
 
 -- write and read logic

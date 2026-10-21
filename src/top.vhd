@@ -35,8 +35,6 @@ entity top is
 end top;
 
 architecture Behavioral of top is
-attribute DONT_TOUCH : string;
-attribute DONT_TOUCH of Behavioral : architecture is "true";
 
 -- control unit
 signal s_regWrite, s_aluSrc, s_memWrite, s_branch, s_jump, s_stall, s_trap: std_logic;
