@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="640" viewBox="0 0 1440 640" font-family="Helvetica, Arial, DejaVu Sans, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#000"/>
+    </marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b85450"/>
+    </marker>
+    <style>
+      .d { fill: none; stroke: #000; stroke-width: 1.3; }
+      .c { fill: none; stroke: #b85450; stroke-width: 1.2; stroke-dasharray: 5 3; }
+      .t { font-size: 15px; text-anchor: middle; dominant-baseline: middle; fill: #222; }
+      .s { font-size: 11px; text-anchor: middle; dominant-baseline: middle; fill: #555; }
+      .l { font-size: 10px; fill: #000; }
+      .lc { font-size: 10px; fill: #b85450; }
+      .h { font-size: 19px; text-anchor: middle; fill: #000; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="640" fill="#fff"/>
+
+  <!-- ===================== stage frames ===================== -->
+  <rect x="20" y="160" width="250" height="180" fill="none" stroke="#000" stroke-width="2"/>
+  <text class="h" x="145" y="150">Fetch</text>
+  <rect x="300" y="40" width="720" height="440" fill="none" stroke="#000" stroke-width="2"/>
+  <text class="h" x="660" y="30">Execute</text>
+  <text class="h" x="1110" y="230">Memory</text>
+
+  <!-- ===================== fetch ===================== -->
+  <rect x="38" y="200" width="92" height="100" rx="10" fill="#f5f5f5" stroke="#666"/>
+  <text class="t" x="84" y="242">Program</text>
+  <text class="t" x="84" y="260">Counter</text>
+  <rect x="160" y="215" width="90" height="70" rx="8" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="t" x="205" y="242">ROM</text>
+  <text class="s" x="205" y="262">256 x 32</text>
+  <path class="d" d="M130,250 H158" marker-end="url(#a)"/>
+  <text class="l" x="134" y="244">PC</text>
+
+  <!-- PC target adder -->
+  <rect x="38" y="380" width="212" height="62" rx="8" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="t" x="144" y="401">PC Target</text>
+  <text class="s" x="144" y="421">(PC or rs1 for JALR) + imm</text>
+  <text class="s" x="144" y="434">bit 0 cleared</text>
+  <path class="d" d="M100,380 V302" marker-end="url(#a)"/>
+  <text class="l" x="104" y="362">pcNext</text>
+
+  <!-- instruction bus -->
+  <path class="d" d="M250,250 H318" marker-end="url(#a)"/>
+  <text class="l" x="276" y="242">instr</text>
+
+  <!-- ===================== control unit ===================== -->
+  <rect x="320" y="180" width="240" height="140" rx="16" fill="#f5f5f5" stroke="#666"/>
+  <text class="t" x="440" y="205">Control Unit</text>
+  <rect x="335" y="230" width="95" height="60" rx="8" fill="#f8cecc" stroke="#b85450"/>
+  <text class="t" x="382" y="252">Main</text>
+  <text class="t" x="382" y="270">Decoder</text>
+  <rect x="450" y="230" width="95" height="60" rx="8" fill="#fff2cc" stroke="#d6b656"/>
+  <text class="t" x="497" y="252">ALU</text>
+  <text class="t" x="497" y="270">Decoder</text>
+
+  <!-- ImmGen -->
+  <rect x="620" y="65" width="110" height="45" rx="8" fill="#fff" stroke="#000"/>
+  <text class="t" x="675" y="88">ImmGen</text>
+  <path class="d" d="M560,190 L618,104" marker-end="url(#a)"/>
+
+  <!-- Register file -->
+  <rect x="620" y="220" width="110" height="100" rx="8" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="t" x="675" y="262">Register File</text>
+  <text class="s" x="675" y="282">32 x 32</text>
+  <path class="d" d="M560,240 H618" marker-end="url(#a)"/>
+  <text class="l" x="566" y="234">rs1, rs2, rd</text>
+
+  <!-- source 1 mux -->
+  <path d="M780,170 L810,185 L810,265 L780,280 Z" fill="#eee" stroke="#000"/>
+  <text class="s" x="795" y="226" transform="rotate(90 795 226)">Src1 MUX</text>
+  <path class="d" d="M730,245 H778" marker-end="url(#a)"/>
+  <text class="l" x="740" y="239">rs1</text>
+  <path class="d" d="M762,198 H778" marker-end="url(#a)"/>
+  <text class="l" x="742" y="201">PC</text>
+  <path class="d" d="M762,268 H778" marker-end="url(#a)"/>
+  <text class="l" x="750" y="271">0</text>
+
+  <!-- source 2 mux -->
+  <path d="M780,300 L810,315 L810,395 L780,410 Z" fill="#eee" stroke="#000"/>
+  <text class="s" x="795" y="355" transform="rotate(90 795 355)">Src2 MUX</text>
+  <path class="d" d="M730,300 H750 V325 H778" marker-end="url(#a)"/>
+  <text class="l" x="736" y="294">rs2</text>
+  <path class="d" d="M730,88 H765 V385 H778" marker-end="url(#a)"/>
+  <text class="l" x="736" y="82">imm</text>
+
+  <!-- ALU -->
+  <path d="M860,200 L960,200 L990,290 L960,380 L860,380 L880,290 Z" fill="#fff2cc" stroke="#d6b656" stroke-width="1.5"/>
+  <text class="t" x="928" y="290">ALU</text>
+  <path class="d" d="M810,225 H864" marker-end="url(#a)"/>
+  <path class="d" d="M810,355 H864" marker-end="url(#a)"/>
+
+  <!-- branch condition -->
+  <rect x="835" y="64" width="178" height="72" rx="8" fill="#dae8fc" stroke="#6c8ebf"/>
+  <text class="t" x="924" y="82">Branch / Jump</text>
+  <text class="s" x="924" y="103" font-size="10">taken = (zero | res[0]) xor f3[0]</text>
+  <text class="s" x="924" y="120" font-size="10">pcSel = jump | (branch &amp; taken)</text>
+  <path class="d" d="M960,200 V138" marker-end="url(#a)"/>
+  <text class="l" x="964" y="170">zero, res[0]</text>
+
+  <!-- ===================== memory ===================== -->
+  <rect x="1040" y="290" width="140" height="58" rx="8" fill="#e1d5e7" stroke="#9673a6"/>
+  <text class="t" x="1110" y="311">SRAM (BRAM)</text>
+  <text class="s" x="1110" y="330">4 KB, byte enables</text>
+  <rect x="1040" y="400" width="140" height="58" rx="8" fill="#d5e8d4" stroke="#82b366"/>
+  <text class="t" x="1110" y="421">Load / Store</text>
+  <text class="t" x="1110" y="439">Unit</text>
+  <path class="d" d="M1085,400 V350" marker-end="url(#a)"/>
+  <text class="l" x="1080" y="380" text-anchor="end">data, BE[3:0]</text>
+  <path class="d" d="M1140,350 V398" marker-end="url(#a)"/>
+  <text class="l" x="1146" y="380">word</text>
+
+  <!-- ALU result: address + write-back -->
+  <path class="d" d="M990,290 H1025 V319 H1038" marker-end="url(#a)"/>
+  <text class="l" x="996" y="284">addr</text>
+  <path class="d" d="M1025,290 V260 H1238" marker-end="url(#a)"/>
+  <text class="l" x="1040" y="254">ALU result</text>
+  <!-- store data (rs2) -->
+  <path class="d" d="M750,325 V440 H1038" marker-end="url(#a)"/>
+  <text class="l" x="900" y="434">rs2 (store data)</text>
+  <!-- load data -->
+  <path class="d" d="M1180,429 H1205 V315 H1238" marker-end="url(#a)"/>
+  <text class="l" x="1186" y="310">load</text>
+
+  <!-- ===================== write-back ===================== -->
+  <path d="M1240,230 L1280,250 L1280,410 L1240,430 Z" fill="#eee" stroke="#000"/>
+  <text class="t" x="1260" y="330" transform="rotate(90 1260 330)">Write-Back</text>
+  <path class="d" d="M1212,395 H1238" marker-end="url(#a)"/>
+  <text class="l" x="1210" y="388">PC+4</text>
+  <!-- testOUT -->
+  <path class="d" d="M1280,330 H1388" marker-end="url(#a)"/>
+  <path d="M1390,320 H1420 V340 H1390 L1380,330 Z" fill="#fff" stroke="#000"/>
+  <text class="l" x="1300" y="322">testOUT[31:0]</text>
+  <!-- feedback to register file -->
+  <path class="d" d="M1300,330 V500 H600 V305 H618" marker-end="url(#a)"/>
+  <text class="l" x="606" y="350">rd data</text>
+
+  <!-- ===================== control signals ===================== -->
+  <path class="c" d="M400,180 V145 H795 V172" marker-end="url(#r)"/>
+  <text class="lc" x="700" y="140">AluSrcA</text>
+  <path class="c" d="M500,180 V158 H900 V198" marker-end="url(#r)"/>
+  <text class="lc" x="840" y="153">AluOP[3:0]</text>
+  <path class="c" d="M440,180 V126 H833" marker-end="url(#r)"/>
+  <text class="lc" x="640" y="121">Branch, Jump, funct3</text>
+  <path class="c" d="M560,280 H618" marker-end="url(#r)"/>
+  <text class="lc" x="566" y="274">RegWrite</text>
+  <path class="c" d="M470,320 V480 H795 V412" marker-end="url(#r)"/>
+  <text class="lc" x="640" y="476">AluSrc</text>
+  <path class="c" d="M530,320 V465 H1110 V460" marker-end="url(#r)"/>
+  <text class="lc" x="900" y="460">MemWrite, funct3</text>
+  <!-- pcSel to PC -->
+  <path class="c" d="M924,64 V52 H62 V198" marker-end="url(#r)"/>
+  <text class="lc" x="200" y="64">pcSel</text>
+  <!-- ResultSrc -->
+  <path class="c" d="M555,320 V490 H1260 V422" marker-end="url(#r)"/>
+  <text class="lc" x="1120" y="486">ResultSrc</text>
+
+  <!-- stall / trap -->
+  <path class="c" d="M360,320 V545" marker-end="url(#r)"/>
+  <text class="lc" x="335" y="535">stall</text>
+  <path class="c" d="M395,320 V545" marker-end="url(#r)"/>
+  <text class="lc" x="402" y="535">trap</text>
+  <path d="M340,548 Q378,538 416,548 Q410,575 378,592 Q346,575 340,548 Z" fill="#fff" stroke="#000"/>
+  <text class="s" x="378" y="562">OR</text>
+  <path class="c" d="M378,592 V615 H10 V250 H36" marker-end="url(#r)"/>
+  <text class="lc" x="120" y="610">stall | trap : freeze PC</text>
+  <!-- trap output -->
+  <path class="c" d="M395,520 H1388" marker-end="url(#r)"/>
+  <path d="M1390,510 H1420 V530 H1390 L1380,520 Z" fill="#fff" stroke="#000"/>
+  <text class="l" x="1340" y="512">trap</text>
+</svg>
