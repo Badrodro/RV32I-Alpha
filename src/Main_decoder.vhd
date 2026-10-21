@@ -1,33 +1,41 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
 
+-- Main decoder: turns an instruction into the control signals of the datapath.
+-- Every encoding that is not an RV32I instruction raises "trap", and so do
+-- ECALL and EBREAK (there is no exception handler: the core halts).
+-- FENCE is executed as a NOP (single hart, no cache).
 
 entity Main_decoder is
      Port (
-        opcode: in std_logic_vector(6 downto 0);
-        
-        regWrite: out std_logic; -- write in register authorization ( ONLY IN REGISTER )
-        immType: out std_logic_vector (2 downto 0); -- 3 bits to select the TYPE of the immediate
-        aluSrc: out std_logic; -- '0' we take the output of the second register, '1' we take the immediate (multiplexer before the ALU) //  either rs1+ rs2 or rs1 + imm (imm is a constant)
+        instr: in std_logic_vector(31 downto 0);
+
+        regWrite: out std_logic; -- the instruction writes rd
+        immType: out std_logic_vector (2 downto 0); -- format of the immediate (see Imm_gen)
+        aluSrc: out std_logic; -- second ALU operand: '0' rs2, '1' immediate
         aluSrcA: out std_logic_vector(1 downto 0); -- first ALU operand: "00" rs1, "01" PC (AUIPC), "10" zero (LUI)
-        memWrite: out std_logic; --  write in RAM or not
-        resultSrc: out std_logic_vector(1 downto 0); -- what we will stock in register ( either the result of the ALU, or a data from the RAM or the return adress)
-        aluOP: out std_logic_vector(1 downto 0); -- code sent to the ALU_decoder module
-        branch: out std_logic; -- if we jump or not
-        isLoad: out std_logic; -- we need a stall because de ram is synchronous
-        jump: out std_logic; -- immediate jump or not
-        jalr: out std_logic;
-        trap: out std_logic -- system event bit
+        memWrite: out std_logic; -- store
+        resultSrc: out std_logic_vector(1 downto 0); -- value written to rd: "00" ALU, "01" load data, "10" PC + 4
+        aluOP: out std_logic_vector(1 downto 0); -- class of ALU operation, refined by the ALU decoder
+        branch: out std_logic; -- conditional branch
+        isLoad: out std_logic; -- load (the data memory is synchronous: 2 cycles)
+        jump: out std_logic; -- JAL or JALR
+        jalr: out std_logic; -- JALR (target = rs1 + imm)
+        trap: out std_logic -- ECALL, EBREAK or illegal instruction
         );
 end Main_decoder;
 
 architecture Behavioral of Main_decoder is
-
-
+    signal opcode: std_logic_vector(6 downto 0);
+    signal funct3: std_logic_vector(2 downto 0);
+    signal funct7: std_logic_vector(6 downto 0);
 begin
 
-process(opcode)
+opcode <= instr(6 downto 0);
+funct3 <= instr(14 downto 12);
+funct7 <= instr(31 downto 25);
+
+process(opcode, funct3, funct7)
 begin
     regWrite <= '0';
     immType <= "000";
@@ -41,143 +49,94 @@ begin
     isLoad <= '0';
     jalr <= '0';
     trap <= '0';
-    case opcode is    
-        when "0110011" => -- R-type
+
+    case opcode is
+        when "0110011" => -- R-type: funct7 must be 0000000, or 0100000 for SUB / SRA
             regWrite <= '1';
-            aluSrc <= '0'; -- only two registers operation
-            memWrite <= '0';
-            resultSrc <= "00"; -- result of the ALU
-            aluOP <= "00";  -- the alu decoder need to watch funct3 and funct7 to choose the specific operation
-            branch <= '0';
-            jump <= '0';
-            isLoad <= '0';
-            jalr <= '0';
-            trap <= '0';
-            
-        when "0010011" => -- I-type
-            regWrite <= '1';
-            immType <= "001";
-            aluSrc <= '1'; -- operation between a register and the immediate
-            memWrite <= '0';
-            resultSrc <= "00";
-            aluOP <= "01"; -- the alu decoder will watch only funct3
-            branch <= '0';
-            jump <= '0';
-            isLoad <= '0';
-            jalr <= '0';
-            trap <= '0';
-            
-        when "0000011" => -- LOAD instructions
+            aluOP <= "00"; -- the ALU decoder looks at funct3 and funct7
+            if not (funct7 = "0000000" or (funct7 = "0100000" and (funct3 = "000" or funct3 = "101"))) then
+                trap <= '1';
+            end if;
+
+        when "0010011" => -- I-type ALU
             regWrite <= '1';
             immType <= "001";
             aluSrc <= '1';
-            memWrite <= '0';
-            resultSrc <= "01"; -- ram 
-            aluOP <= "10"; -- forced addition
-            branch <= '0';
-            jump <= '0';
+            aluOP <= "01"; -- the ALU decoder looks at funct3 (and funct7 for the shifts)
+            if funct3 = "001" and funct7 /= "0000000" then -- SLLI
+                trap <= '1';
+            elsif funct3 = "101" and funct7 /= "0000000" and funct7 /= "0100000" then -- SRLI / SRAI
+                trap <= '1';
+            end if;
+
+        when "0000011" => -- loads: LB LH LW LBU LHU
+            regWrite <= '1';
+            immType <= "001";
+            aluSrc <= '1';
+            resultSrc <= "01";
+            aluOP <= "10"; -- address = rs1 + imm
             isLoad <= '1';
-            jalr <= '0';
-            trap <= '0';
-            
-        when "0100011" => -- STORE instructions
-            regWrite <= '0';
-            immType <= "010"; -- store-type immediate
+            if funct3 = "011" or funct3 = "110" or funct3 = "111" then
+                trap <= '1';
+            end if;
+
+        when "0100011" => -- stores: SB SH SW
+            immType <= "010";
             aluSrc <= '1';
-            memWrite <= '1'; -- write in RAM
+            memWrite <= '1';
             aluOP <= "10";
-            branch <= '0';
-            jump <= '0';
-            isLoad <= '0';
-            jalr <= '0';
-            trap <= '0';
-            
-        when "1100011" => -- branch
-            regWrite <= '0';
-            immType <= "011"; -- b-type
-            aluSrc <= '0';
-            memWrite <= '0';
-            aluOP <= "11"; -- comparison selected by funct3 in the ALU decoder
+            if funct3(2) = '1' or funct3 = "011" then
+                trap <= '1';
+            end if;
+
+        when "1100011" => -- branches
+            immType <= "011";
+            aluOP <= "11"; -- comparison chosen by funct3 in the ALU decoder
             branch <= '1';
-            jump <= '0';
-            isLoad <= '0';
-            jalr <= '0';
-            trap <= '0';
-            
-        when "1101111" => -- JAL instruction
+            if funct3(2 downto 1) = "01" then
+                trap <= '1';
+            end if;
+
+        when "1101111" => -- JAL
             regWrite <= '1';
-            immType <= "101"; -- j-type
-            memWrite <= '0';
-            resultSrc <= "10"; -- the return address is saved
-            branch <= '0';
+            immType <= "101";
+            resultSrc <= "10"; -- rd = PC + 4
             jump <= '1';
-            isLoad <= '0';
-            jalr <= '0';
-            trap <= '0';
-            
-        when "1100111" => -- JALR instruction
+
+        when "1100111" => -- JALR
             regWrite <= '1';
             immType <= "001";
             aluSrc <= '1';
-            memWrite <= '0';
             resultSrc <= "10";
-            aluOP <= "10"; 
-            branch <= '0';
-            jump <= '1';
-            isLoad <= '0';
-            jalr <= '1';
-            trap <= '0';
-            
-        when "0110111" => --LUI instruction
-            regWrite <= '1';
-            immType <= "100";
-            aluSrc <= '1';
-            aluSrcA <= "10"; -- rd = 0 + imm (bits 19:15 are part of the immediate, not rs1)
-            memWrite <= '0';
-            resultSrc <= "00";
-            aluOP <= "10";  
-            branch <= '0';
-            jump <= '0';
-            isLoad <= '0';
-            jalr <= '0';
-            trap <= '0';
-            
-        when "0010111" => -- AUIPC instruction
-            regWrite <= '1';
-            immType <= "100";
-            aluSrc <= '1';
-            aluSrcA <= "01"; -- rd = PC + imm
-            memWrite <= '0';
-            resultSrc <= "00";
             aluOP <= "10";
-            branch <= '0';
-            jump <= '0';
-            isLoad <= '0';
-            trap <= '0';
-            
-        when "1110011" => -- SYSTEM instruction
-            regWrite <= '0';
-            aluSrc <= '0';
-            memWrite <= '0';
-            branch <= '0';
-            jump <= '0';
-            isLoad <= '0';
-            jalr <= '0';
+            jump <= '1';
+            jalr <= '1';
+            if funct3 /= "000" then
+                trap <= '1';
+            end if;
+
+        when "0110111" => -- LUI: rd = 0 + imm (bits 19:15 belong to the immediate, not to rs1)
+            regWrite <= '1';
+            immType <= "100";
+            aluSrc <= '1';
+            aluSrcA <= "10";
+            aluOP <= "10";
+
+        when "0010111" => -- AUIPC: rd = PC + imm
+            regWrite <= '1';
+            immType <= "100";
+            aluSrc <= '1';
+            aluSrcA <= "01";
+            aluOP <= "10";
+
+        when "0001111" => -- FENCE: NOP (FENCE.I is not part of RV32I)
+            if funct3 /= "000" then
+                trap <= '1';
+            end if;
+
+        when others => -- SYSTEM (ECALL, EBREAK, CSRs) and every unknown opcode
             trap <= '1';
-            
-        when others => -- includes FENCE, executed as a NOP (single hart, no cache)
-            regWrite <= '0';
-            aluSrc <= '0';
-            memWrite <= '0';
-            aluOP <= "00";
-            branch <= '0';
-            jump <= '0';
-            isLoad <= '0';
-            jalr <= '0';
-            trap <= '0';
-       end case;
+    end case;
 end process;
-    
-    
 
 end Behavioral;
