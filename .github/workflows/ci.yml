@@ -1,0 +1,15 @@
+name: Simulation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  torture-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GHDL
+        run: sudo apt-get update && sudo apt-get install -y ghdl
+      - name: Run the self-checking torture test
+        run: ./scripts/sim.sh

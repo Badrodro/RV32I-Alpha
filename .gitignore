@@ -1,0 +1,11 @@
+# Build outputs
+build/
+
+# Vivado
+.Xil/
+*.jou
+*.log
+*.str
+*.backup.*
+vivado_*.zip
+usage_statistics_webtalk.*

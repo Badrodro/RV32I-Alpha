@@ -14,6 +14,7 @@ architecture sim of top_tb is
     signal testOUT_tb : std_logic_vector(31 downto 0);
 
     constant clk_period : time := 10 ns;
+    signal sim_done   : boolean := false; -- stops the clock so the simulation ends by itself
 
 begin
 
@@ -29,8 +30,11 @@ begin
     -- 4. Clock Generation Process
     clk_process : process
     begin
-        clk_tb <= '0'; wait for clk_period/2;
-        clk_tb <= '1'; wait for clk_period/2;
+        while not sim_done loop
+            clk_tb <= '0'; wait for clk_period/2;
+            clk_tb <= '1'; wait for clk_period/2;
+        end loop;
+        wait;
     end process;
 
     -- 5. Intelligent Stimulus Process
@@ -61,7 +65,8 @@ begin
             assert false report "ERROR: torture test failed at test number " & integer'image(to_integer(unsigned(last_wb))) severity failure;
         end if;
 
-        -- Stop simulation
+        -- Stop simulation (no more events once the clock stops)
+        sim_done <= true;
         wait;
     end process;
 
