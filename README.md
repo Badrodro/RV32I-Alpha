@@ -87,17 +87,29 @@ Not done yet: power grid, clock-tree synthesis, timing repair and timing closure
 and LVS, GDSII. The next step is a full LibreLane run. Commands and the source of each number:
 [asic/README.md](asic/README.md).
 
-### FPGA (Basys 3, XC7A35T)
+### FPGA (Basys 3, XC7A35T-1, Vivado 2024.2)
 
-`scripts/vivado_build.tcl` builds the bitstream for the board (core, BRAM instruction and data
-memories, Pmod output of the write-back bus) and also synthesizes the core alone out of context.
-Pin mapping (`constraints/Basys3.xdc`): `clk` on the 100 MHz oscillator, `reset` on BTNC, `trap`
-on LED 15, and the last value written to a register on the four Pmod headers.
+`scripts/vivado_build.tcl` runs two implementations and writes their reports to `reports/`:
+the core alone, out of context, and the board top level (core, instruction ROM, 4 KB data RAM in
+one BRAM, reset synchronizer, Pmod output of the write-back bus). Pin mapping
+(`constraints/Basys3.xdc`): `clk` on the 100 MHz oscillator, `reset` on BTNC, `trap` on LED 15,
+and the last value written to a register on the four Pmod headers.
 
-The script writes its utilization, timing and power reports to `reports/`. Vivado figures for
-the current version are not published yet. Open-source estimate for the core alone
-(`scripts/synth_report.sh`, Yosys 0.62 `synth_xilinx`, xc7; Yosys is usually larger than Vivado):
-885 logic LUTs, 48 LUTs used as distributed RAM for the register file, 63 flip-flops.
+| Implementation (routed) | LUTs | Flip-flops | BRAM | Timing at 100 MHz |
+| :--- | ---: | ---: | ---: | :--- |
+| Core alone, out of context | 675 (631 logic, 44 distributed RAM for the register file) | 63 | 0 | met, worst slack +0.111 ns |
+| Board top level | 751 (707 logic, 44 distributed RAM) | 127 | 1 | **not met**, worst slack &minus;0.538 ns |
+
+- The out-of-context run constrains only the paths between registers of the core; its memory
+  ports have no input or output delays.
+- On the board, the critical path (9.97 ns) runs from the instruction ROM output register through
+  the register file, the second-operand mux and the address computation to the write enable of
+  the data BRAM. Static timing therefore supports about 95 MHz (10.54 ns) for the board build,
+  not 100 MHz.
+- The instruction ROM has constant contents, so Vivado builds it from LUTs and a 32-bit output
+  register instead of a BRAM.
+- Power estimate for the board build (vectorless, medium confidence): 80 mW on chip, of which
+  72 mW device static and 8 mW dynamic.
 
 ## Repository layout
 
@@ -110,6 +122,7 @@ the current version are not published yet. Open-source estimate for the core alo
 | `asic/` | SKY130 synthesis, place-and-route and plotting scripts |
 | `scripts/` | Simulation, Vivado build and synthesis estimate scripts |
 | `constraints/` | Basys 3 pin constraints |
+| `reports/` | Vivado reports of the current version |
 | `assets/` | Architecture diagram and layout figure |
 
 After editing the torture test, regenerate the ROM with `python3 asm/build_rom.py` (needs
@@ -118,7 +131,7 @@ After editing the torture test, regenerate the ROM with `python3 asm/build_rom.p
 ## Roadmap
 
 - Full LibreLane run: power grid, clock tree, sign-off timing, DRC and LVS, GDSII.
-- Vivado figures (area, timing, power) for the current version.
+- Close timing at 100 MHz on the board build (data-memory write-enable path).
 - The `rv32ui` tests from [riscv-tests](https://github.com/riscv-software-src/riscv-tests).
 
 ## Contact
