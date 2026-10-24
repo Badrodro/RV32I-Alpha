@@ -10,6 +10,7 @@ functional ports only; the RVFI trace port, used for formal verification, is lef
 | `config.json` | LibreLane configuration |
 | `rv32i_alpha_macro.sv` | Top level of the macro |
 | `defplot.py` | Draws the placement, the signal wires and the power grid from a routed DEF |
+| `macro/` | GDSII (gzip), LEF and sign-off metrics of the run reported below |
 
 ## Running it
 
@@ -25,7 +26,8 @@ python3 defplot.py "$PDK_ROOT/sky130A/libs.ref/sky130_fd_sc_hd/lef/sky130_fd_sc_
 ```
 
 The GDSII is written to `runs/signoff/final/gds/`, and every number below is in
-`runs/signoff/final/metrics.json`.
+`runs/signoff/final/metrics.json`. The files of the run reported here are in `macro/`: the GDSII
+(gzip), the LEF abstract for integration in a larger design, and `metrics.json`.
 
 ## Constraints
 
