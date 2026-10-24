@@ -94,11 +94,10 @@ memories, Pmod output of the write-back bus) and also synthesizes the core alone
 Pin mapping (`constraints/Basys3.xdc`): `clk` on the 100 MHz oscillator, `reset` on BTNC, `trap`
 on LED 15, and the last value written to a register on the four Pmod headers.
 
-Vivado figures for the current version have not been regenerated yet. The files in `reports/`
-and the report screenshots in `assets/` come from the first, single-cycle version and are kept
-for reference only. Open-source estimate for the core alone (`scripts/synth_report.sh`, Yosys
-0.62 `synth_xilinx`, xc7; Yosys is usually larger than Vivado): 885 logic LUTs, 48 LUTs used as
-distributed RAM for the register file, 63 flip-flops.
+The script writes its utilization, timing and power reports to `reports/`. Vivado figures for
+the current version are not published yet. Open-source estimate for the core alone
+(`scripts/synth_report.sh`, Yosys 0.62 `synth_xilinx`, xc7; Yosys is usually larger than Vivado):
+885 logic LUTs, 48 LUTs used as distributed RAM for the register file, 63 flip-flops.
 
 ## Repository layout
 
@@ -111,7 +110,7 @@ distributed RAM for the register file, 63 flip-flops.
 | `asic/` | SKY130 synthesis, place-and-route and plotting scripts |
 | `scripts/` | Simulation, Vivado build and synthesis estimate scripts |
 | `constraints/` | Basys 3 pin constraints |
-| `reports/`, `assets/` | Vivado reports (first version), diagrams and figures |
+| `assets/` | Architecture diagram and layout figure |
 
 After editing the torture test, regenerate the ROM with `python3 asm/build_rom.py` (needs
 `llvm-mc` and `llvm-objcopy`).
