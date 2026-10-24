@@ -30,3 +30,12 @@ jobs:
         run: ./formal/run.sh
       - name: VHDL / SystemVerilog equivalence
         run: ./formal/equiv_vhdl_sv.sh
+
+  rv32ui:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang, lld and Icarus Verilog
+        run: sudo apt-get update && sudo apt-get install -y clang lld llvm iverilog
+      - name: riscv-tests rv32ui
+        run: ./tests/rv32ui/run.sh

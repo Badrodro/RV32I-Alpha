@@ -4,9 +4,9 @@
 
 RV32I-Alpha is a 32-bit RISC-V core that implements the RV32I base integer instruction set.
 It is written in VHDL; a SystemVerilog version is proven equivalent to it. The core is checked
-with [riscv-formal](https://github.com/YosysHQ/riscv-formal), runs on a Digilent Basys 3
-(Xilinx Artix-7), and has been hardened to a DRC- and LVS-clean GDSII macro in the SkyWater
-SKY130 process with open-source tools.
+with [riscv-formal](https://github.com/YosysHQ/riscv-formal) and passes the official `rv32ui`
+tests. It is built for the Digilent Basys 3 (Xilinx Artix-7) with Vivado, and has been hardened to
+a DRC- and LVS-clean GDSII macro in the SkyWater SKY130 process with open-source tools.
 
 ## Architecture
 
@@ -48,6 +48,7 @@ SKY130 process with open-source tools.
 | Every non-RV32I word traps, against an independent reference decoder | SymbiYosys, `formal/memcheck.sv` | 16 |
 | VHDL and SystemVerilog versions are sequentially equivalent (1794 / 1794 cells) | Yosys `equiv_make`, `equiv_induct` | induction |
 | Self-checking torture test passes in 197 cycles | GHDL | full program |
+| [riscv-tests](https://github.com/riscv-software-src/riscv-tests) `rv32ui`: 40 tests pass, with random data-port wait states | Icarus Verilog, SystemVerilog core | full programs |
 
 riscv-formal and the memory-port checks use bounded model checking: they show that no
 counterexample exists within the stated number of cycles from reset, not correctness for every
@@ -65,9 +66,13 @@ every load and store width, back-to-back loads and the use of a value right afte
 | riscv-formal and memory-port checks (48 checks, about a minute on 4 cores) | `./formal/run.sh` |
 | VHDL / SystemVerilog equivalence | `./formal/equiv_vhdl_sv.sh` |
 | Torture test in simulation | `./scripts/sim.sh` |
+| `rv32ui` tests (about 10 s) | `./tests/rv32ui/run.sh` |
 
-All three run in CI on every push (*Actions* tab). `formal/run.sh` downloads riscv-formal at a
-fixed commit.
+All four run in CI on every push (*Actions* tab). `formal/run.sh` and `tests/rv32ui/run.sh`
+download riscv-formal and riscv-tests at fixed commits. The `rv32ui` tests run with a minimal test
+environment (the core has no CSRs: a test ends with ECALL and reports its result in `gp`); two
+tests are skipped: `fence_i` (self-modifying code, which separate instruction and data ports do
+not support) and `ma_data` (misaligned accesses, which the core traps by design).
 
 ## Implementation
 
@@ -89,7 +94,8 @@ and the power grid. Drawn from the final DEF by `asic/defplot.py`.*
 The input and output delays are the LibreLane defaults (20 % of the clock period on every port).
 The slow corner fails on the combinational paths from the instruction input through the execute
 stage to the data-memory outputs. Constraints, commands and the source of each number:
-[asic/README.md](asic/README.md).
+[asic/README.md](asic/README.md). The GDSII (gzip), the LEF and the sign-off metrics of this run
+are in [asic/macro/](asic/macro/).
 
 ### FPGA (Basys 3, XC7A35T-1, Vivado 2024.2)
 
@@ -97,7 +103,8 @@ stage to the data-memory outputs. Constraints, commands and the source of each n
 the core alone, out of context, and the board top level (core, instruction ROM, 4 KB data RAM in
 one BRAM, reset synchronizer, Pmod output of the write-back bus). Pin mapping
 (`constraints/Basys3.xdc`): `clk` on the 100 MHz oscillator, `reset` on BTNC, `trap` on LED 15,
-and the last value written to a register on the four Pmod headers.
+and the last value written to a register on the four Pmod headers. The bitstream has not been
+tested on a board yet.
 
 | Implementation (routed) | LUTs | Flip-flops | BRAM | Timing at 100 MHz |
 | :--- | ---: | ---: | ---: | :--- |
@@ -122,6 +129,7 @@ and the last value written to a register on the four Pmod headers.
 | `src/` | VHDL core (`core.vhd`) and Basys 3 top level with its memories |
 | `rtl/core/` | SystemVerilog version of the core |
 | `tb/`, `asm/` | Testbench, torture test program and ROM generator |
+| `tests/rv32ui/` | Test environment, testbench and script for the riscv-tests `rv32ui` suite |
 | `formal/` | riscv-formal configuration, memory-port properties, equivalence script |
 | `asic/` | LibreLane configuration, macro top level and layout plotting script |
 | `scripts/` | Simulation, Vivado build and synthesis estimate scripts |
@@ -136,7 +144,7 @@ After editing the torture test, regenerate the ROM with `python3 asm/build_rom.p
 
 - Close timing at the SKY130 slow corner (ss, 100 &deg;C, 1.60 V).
 - Close timing at 100 MHz on the board build (data-memory write-enable path).
-- The `rv32ui` tests from [riscv-tests](https://github.com/riscv-software-src/riscv-tests).
+- Run the bitstream on a Basys 3 board.
 
 ## Contact
 
