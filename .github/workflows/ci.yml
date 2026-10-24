@@ -28,3 +28,5 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: riscv-formal + memory-port checks
         run: ./formal/run.sh
+      - name: VHDL / SystemVerilog equivalence
+        run: ./formal/equiv_vhdl_sv.sh
