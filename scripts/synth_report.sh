@@ -4,8 +4,10 @@
 #   FPGA : Yosys synth_xilinx (xc7), cells after mapping. Yosys is usually less
 #          efficient than Vivado, so compare versions with each other, not with Vivado.
 #   ASIC : Yosys + ABC mapped on sky130_fd_sc_hd (typical corner, 25 C, 1.8 V),
-#          cell area and the longest register-to-register path reported by OpenSTA
-#          (no wires, no placement: an optimistic but consistent estimate).
+#          cell area and the longest path reported by OpenSTA. No placement, no wires,
+#          no buffering and no gate resizing: a few weak cells driving large fanouts
+#          dominate the path, and small RTL changes can move it by several ns. Use the
+#          area to compare versions; do not read the path as a clock frequency.
 #
 # Needs yosys with the GHDL plugin. The ASIC part needs a sky130 liberty file
 # (LIB=... or PDK_ROOT set) and OpenSTA ("sta") on the PATH; it is skipped otherwise.
