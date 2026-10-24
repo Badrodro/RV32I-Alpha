@@ -1,5 +1,7 @@
 # RV32I-Alpha: a two-stage RISC-V core for the Basys 3 and SKY130
 
+![CI](https://github.com/Badrodro/RV32I-Alpha/actions/workflows/ci.yml/badge.svg)
+
 RV32I-Alpha is a 32-bit RISC-V core that implements the RV32I base integer instruction set.
 It is written in VHDL; a SystemVerilog version is proven equivalent to it. The core is checked
 with [riscv-formal](https://github.com/YosysHQ/riscv-formal), runs on a Digilent Basys 3
@@ -64,8 +66,8 @@ every load and store width, back-to-back loads and the use of a value right afte
 | VHDL / SystemVerilog equivalence | `./formal/equiv_vhdl_sv.sh` |
 | Torture test in simulation | `./scripts/sim.sh` |
 
-The same three commands are defined as a GitHub Actions workflow (`.github/workflows/ci.yml`).
-`formal/run.sh` downloads riscv-formal at a fixed commit.
+All three run in CI on every push (*Actions* tab). `formal/run.sh` downloads riscv-formal at a
+fixed commit.
 
 ## Implementation
 
