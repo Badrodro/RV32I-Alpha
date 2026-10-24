@@ -9,3 +9,6 @@ build/
 *.backup.*
 vivado_*.zip
 usage_statistics_webtalk.*
+
+# LibreLane runs
+asic/runs/

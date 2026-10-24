@@ -1,4 +1,4 @@
-"""Plot a routed DEF (placement + signal wires) as a two-panel PNG.
+"""Plot a routed DEF as a two-panel PNG: (a) placement, (b) signal wires and power grid.
 
 usage: python3 defplot.py <cells.lef> <design.def> <out.png>
 Pure Python + Pillow; no EDA viewer needed.
@@ -29,7 +29,11 @@ dbu = 1000.0
 die = None
 cells = []                      # (master, x, y, orient)
 de_nets = defaultdict(list)     # net -> instances whose DE pin it drives
+rf_q = set()                    # instances whose Q output drives a register-file net
 wires = defaultdict(list)       # layer -> [(x0, y0, x1, y1)] in microns
+power = []                      # (layer, width, shape, x0, y0, x1, y1) in microns
+SPECIAL = re.compile(r'(?:ROUTED|NEW)\s+(met\d)\s+(\d+)\s+\+\s+SHAPE\s+(STRIPE|FOLLOWPIN)\s+'
+                     r'\(\s*(\S+)\s+(\S+)\s*\)\s+\(\s*(\S+)\s+(\S+)\s*\)')
 section = None
 net_buf = []
 
@@ -70,6 +74,17 @@ for line in open(def_path):
         section = 'N'
     elif s.startswith('END NETS'):
         section = None
+    elif s.startswith('SPECIALNETS'):
+        section = 'S'
+    elif s.startswith('END SPECIALNETS'):
+        section = None
+    elif section == 'S':
+        m = SPECIAL.search(s)
+        if m and int(m.group(2)) > 0:
+            xa, ya = float(m.group(4)) / dbu, float(m.group(5)) / dbu
+            xb = xa if m.group(6) == '*' else float(m.group(6)) / dbu
+            yb = ya if m.group(7) == '*' else float(m.group(7)) / dbu
+            power.append((m.group(1), int(m.group(2)) / dbu, m.group(3), xa, ya, xb, yb))
     elif section == 'C' and s.startswith('-'):
         m = re.match(r'-\s+(\S+)\s+(\S+).*?(?:PLACED|FIXED)\s+\(\s*(-?\d+)\s+(-?\d+)\s*\)\s+(\S+)', s)
         if m:
@@ -83,13 +98,17 @@ for line in open(def_path):
             name = stmt.split()[1]
             for inst in re.findall(r'\(\s*(\S+)\s+DE\s*\)', stmt):
                 de_nets[name].append(inst)
+            if re.search(r'rf\.regs', name):
+                rf_q.update(re.findall(r'\(\s*(\S+)\s+Q\s*\)', stmt))
             parse_route(stmt)
 
-# Register-file flip-flops: enable flops whose DE net fans out to 32 of them.
-regfile = set()
-for insts in de_nets.values():
-    if len(insts) == 32:
-        regfile.update(insts)
+# Register-file flip-flops: the flops driving the nets named rf.regs[..] when the netlist keeps
+# that name; otherwise the enable flops on the 31 write-enable nets that each drive 32 of them.
+regfile = set(rf_q)
+if not regfile:
+    for insts in de_nets.values():
+        if len(insts) == 32:
+            regfile.update(insts)
 
 # ---- drawing ----
 SS = 3                          # supersampling factor
@@ -115,7 +134,6 @@ img = Image.new('RGB', (W * SS, H * SS), 'white')
 d = ImageDraw.Draw(img)
 
 GREY = (200, 200, 200)
-TAP = (236, 236, 236)
 RF = (64, 96, 150)              # register file
 FF = (170, 60, 50)              # other flip-flops
 n_rf = n_ff = 0
@@ -123,11 +141,11 @@ for name, master, x, y, orient in cells:
     w, h = size.get(master, (0.46, 2.72))
     if orient in ('E', 'W', 'FE', 'FW'):
         w, h = h, w
-    if 'tapvpwrvgnd' in master:
-        col = TAP
+    if re.search(r'__(fill|decap|tapvpwrvgnd|diode)', master):
+        continue                # physical-only cells are left out
     elif name in regfile:
         col = RF; n_rf += 1
-    elif re.search(r'__e?df|__dl|__sdf', master):
+    elif re.search(r'__(e?df|dlx|dlr|sdf)', master):
         col = FF; n_ff += 1
     else:
         col = GREY
@@ -135,9 +153,16 @@ for name, master, x, y, orient in cells:
     b = to_px(0, x + w, y)
     d.rectangle([a[0], a[1], b[0] - 1, b[1] - 1], fill=col)
 
-# Routing panel: draw each layer on its own transparent overlay.
-LAYERS = [('met1', (40, 90, 175)), ('met2', (190, 50, 45)),
-          ('met3', (40, 140, 80)), ('met4', (120, 70, 160))]
+# Routing panel: power grid first (met1 rails, met4/met5 straps), then the signal wires,
+# each layer on its own transparent overlay.
+RAIL = (225, 225, 225)
+STRAP = (150, 150, 150)
+for layer, width, shape, xa, ya, xb, yb in power:
+    col = RAIL if shape == 'FOLLOWPIN' else STRAP
+    px = max(SS, round(width * scale * SS)) if shape == 'STRIPE' else SS
+    d.line([to_px(1, xa, ya), to_px(1, xb, yb)], fill=col, width=px)
+LAYERS = [('met1', (40, 90, 175)), ('met2', (190, 50, 45)), ('met3', (40, 140, 80)),
+          ('met4', (120, 70, 160)), ('met5', (215, 140, 20))]
 for layer, col in LAYERS:
     ov = Image.new('RGBA', img.size, (0, 0, 0, 0))
     od = ImageDraw.Draw(ov)
@@ -146,7 +171,7 @@ for layer, col in LAYERS:
     img.paste(ov, (0, 0), ov)
 
 # Die outlines, titles, scale bars, legends.
-for panel, title in ((0, '(a) Placement'), (1, '(b) Signal routing, met1–met4')):
+for panel, title in ((0, '(a) Placement'), (1, '(b) Signal wires and power grid')):
     a = to_px(panel, x0, y1)
     b = to_px(panel, x1, y0)
     d.rectangle([a[0], a[1], b[0], b[1]], outline=(0, 0, 0), width=SS)
@@ -163,12 +188,17 @@ for panel, title in ((0, '(a) Placement'), (1, '(b) Signal routing, met1–met4'
     if panel == 0:
         items = [(RF, 'register file'), (FF, 'other flip-flops'), (GREY, 'logic')]
     else:
-        items = [(c, n) for n, c in LAYERS]
+        items = [(None, 'metal')] + [(c, n[3:]) for n, c in LAYERS if wires.get(n)]
+        items.append((STRAP, 'power grid'))
     lx = bar_end + 12 * SS + d.textlength(lab, font=small) + 44 * SS
     for col, label in items:
+        if col is None:             # plain text before a group of swatches
+            d.text((lx, yb), label, font=small, fill=(0, 0, 0), anchor='lm')
+            lx += d.textlength(label, font=small) + 18 * SS
+            continue
         d.rectangle([lx, yb - 11 * SS, lx + 22 * SS, yb + 11 * SS], fill=col)
         d.text((lx + 30 * SS, yb), label, font=small, fill=(0, 0, 0), anchor='lm')
-        lx += 30 * SS + d.textlength(label, font=small) + 30 * SS
+        lx += 30 * SS + d.textlength(label, font=small) + (18 if panel else 30) * SS
     assert lx < (panel + 1) * (P + 2 * M) * SS, 'legend wider than the panel'
 
 img = img.resize((W, H), Image.LANCZOS)

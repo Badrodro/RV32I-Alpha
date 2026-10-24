@@ -1,0 +1,16 @@
+{
+    "DESIGN_NAME": "rv32i_alpha_macro",
+    "VERILOG_FILES": [
+        "dir::../rtl/core/rv32i_decoder.sv",
+        "dir::../rtl/core/rv32i_alu.sv",
+        "dir::../rtl/core/rv32i_lsu.sv",
+        "dir::../rtl/core/rv32i_regfile.sv",
+        "dir::../rtl/core/rv32i_core.sv",
+        "dir::rv32i_alpha_macro.sv"
+    ],
+    "CLOCK_PORT": "clk",
+    "CLOCK_PERIOD": 25,
+    "FP_CORE_UTIL": 40,
+    "PL_TARGET_DENSITY_PCT": 50,
+    "SYNTH_STRATEGY": "DELAY 1"
+}

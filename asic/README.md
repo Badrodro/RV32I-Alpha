@@ -1,30 +1,71 @@
-# SKY130 flow for the core
+# SKY130 implementation of the core
 
-Synthesis, placement and routing of the SystemVerilog core (`rtl/core/`) in the SkyWater
-SKY130 process, with the `sky130_fd_sc_hd` standard cells at the typical corner.
+The SystemVerilog core (`rtl/core/`) is hardened to a GDSII macro in the SkyWater SKY130 process
+with [LibreLane](https://github.com/librelane/librelane) (Yosys, OpenROAD, Magic, KLayout,
+Netgen) and the `sky130_fd_sc_hd` standard cells. `rv32i_alpha_macro.sv` wraps the core with its
+functional ports only; the RVFI trace port, used for formal verification, is left out.
 
-Tools used for the numbers below: Yosys 0.62, OpenROAD 26Q2, Python 3 with Pillow. PDK: sky130A
-built by ciel, open_pdks `8afc8346`. Yosys 0.33 gives a different netlist (4 976 cells,
-60 335 µm²), so the Yosys version matters.
+| File | Contents |
+| :--- | :--- |
+| `config.json` | LibreLane configuration |
+| `rv32i_alpha_macro.sv` | Top level of the macro |
+| `defplot.py` | Draws the placement, the signal wires and the power grid from a routed DEF |
 
-From the repository root, with `PDK_ROOT` pointing to the sky130 version directory:
+## Running it
+
+Tools used for the results below: LibreLane 3.0.16 and the sky130A PDK built by ciel from
+open_pdks `8afc8346`. The full flow takes about 40 minutes on 4 cores.
 
 ```sh
-yosys -c asic/core_syn.tcl            # -> build/asic/core_syn.v, core_syn.stat
-openroad -exit asic/core_pnr.tcl      # -> build/asic/core.def (about 25 min on 4 threads)
-python3 asic/defplot.py \
-    $PDK_ROOT/sky130A/libs.ref/sky130_fd_sc_hd/lef/sky130_fd_sc_hd.lef \
-    build/asic/core.def build/asic/core_layout.png
+cd asic
+librelane --manual-pdk --pdk-root "$PDK_ROOT" --pdk sky130A --scl sky130_fd_sc_hd \
+    --run-tag signoff config.json
+python3 defplot.py "$PDK_ROOT/sky130A/libs.ref/sky130_fd_sc_hd/lef/sky130_fd_sc_hd.lef" \
+    runs/signoff/final/def/rv32i_alpha_macro.def layout.png
 ```
 
-| Value | Source |
-| :--- | :--- |
-| 4 696 cells, 59 557 µm² | `core_syn.stat` (standard cells only, no tap cells) |
-| die 375.8 × 375.8 µm | `DIEAREA` in `core.def` |
-| 47 % utilization, 61 737 µm² | `report_design_area` (includes 1 742 tap cells) |
-| 234 224 µm of wire, 42 237 vias | detailed router log; `defplot.py` recomputes the same wire length from the DEF |
-| 0 violations | detailed router (`build/asic/drc.rpt` is empty); this is not a sign-off DRC |
-| 992 register-file flip-flops | `defplot.py`: enable flip-flops on the 31 write-enable nets that each drive 32 of them |
+The GDSII is written to `runs/signoff/final/gds/`, and every number below is in
+`runs/signoff/final/metrics.json`.
 
-Not done in this flow: power grid, clock-tree synthesis, buffering and timing repair, timing
-closure, sign-off DRC and LVS, GDSII.
+## Constraints
+
+- Clock period 25 ns (40 MHz).
+- LibreLane default I/O constraints: input and output delays of 20 % of the clock period on
+  every port, 33.4 fF load on each output.
+- Synthesis strategy `DELAY 1`, core utilization target 40 %.
+
+The longest paths are combinational from the instruction input (`imem_rdata`) to the data-memory
+outputs and the write-back bus: the instruction memory register is the pipeline register, so
+decode, register read, ALU and address computation share one cycle with the port delays.
+
+## Results
+
+| Item | Result |
+| :--- | :--- |
+| Die | 466.9 &times; 477.6 &micro;m (0.223 mm&sup2;) |
+| Standard cells | 13 350 cells (not counting fill and decap), 112 623 &micro;m&sup2;, 54 % utilization |
+| Flip-flops | 1 055: 992 in the register file (x1&ndash;x31), 63 elsewhere |
+| Buffers added for timing | 2 838, of which 1 037 for hold |
+| Routed wire length | 527 mm, met1&ndash;met5 |
+| DRC (Magic and KLayout) | 0 violations |
+| LVS (Netgen) | layout matches the netlist |
+| Antenna | 0 violating nets |
+| Power, typical corner at 40 MHz | 5.9 mW (OpenSTA, default switching activity) |
+
+Setup and hold slack at 25 ns, after routing, with extracted parasitics (nominal RC corner):
+
+| Corner | Setup slack | Hold slack |
+| :--- | ---: | ---: |
+| Typical (tt, 25 &deg;C, 1.80 V) | +4.24 ns | +0.34 ns |
+| Fast (ff, &minus;40 &deg;C, 1.95 V) | +7.89 ns | +0.13 ns |
+| Slow (ss, 100 &deg;C, 1.60 V) | **&minus;4.85 ns** | +0.90 ns |
+
+- Setup is met at 40 MHz at the typical and fast corners, and hold at every corner, including
+  the minimum and maximum RC corners (typical setup slack between +3.77 and +4.74 ns).
+- Setup is **not** met at the slow corner (down to &minus;5.72 ns with maximum RC). Closing it
+  needs a longer clock period or a shorter combinational path through the execute stage.
+- Remaining electrical warnings at the typical corner: 31 max-slew (slowest edge 0.90 ns
+  against a 0.75 ns limit), 2 max-capacitance (clock-tree root and one fanout buffer) and
+  8 max-fanout (clock-tree and fanout buffers).
+
+![Layout](../assets/rv32i_sky130_layout.png)

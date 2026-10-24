@@ -5,8 +5,8 @@
 RV32I-Alpha is a 32-bit RISC-V core that implements the RV32I base integer instruction set.
 It is written in VHDL; a SystemVerilog version is proven equivalent to it. The core is checked
 with [riscv-formal](https://github.com/YosysHQ/riscv-formal), runs on a Digilent Basys 3
-(Xilinx Artix-7), and has been placed and routed in the SkyWater SKY130 process with open-source
-tools.
+(Xilinx Artix-7), and has been hardened to a DRC- and LVS-clean GDSII macro in the SkyWater
+SKY130 process with open-source tools.
 
 ## Architecture
 
@@ -46,7 +46,7 @@ tools.
 | Instruction port: the retired instruction is the word fetched at its PC | SymbiYosys, `formal/memcheck.sv` | 16 |
 | Data port, with random wait states: a load returns the bytes last stored at its address | SymbiYosys, `formal/memcheck.sv` | 10 |
 | Every non-RV32I word traps, against an independent reference decoder | SymbiYosys, `formal/memcheck.sv` | 16 |
-| VHDL and SystemVerilog versions are sequentially equivalent (1826 / 1826 cells) | Yosys `equiv_make`, `equiv_induct` | induction |
+| VHDL and SystemVerilog versions are sequentially equivalent (1794 / 1794 cells) | Yosys `equiv_make`, `equiv_induct` | induction |
 | Self-checking torture test passes in 197 cycles | GHDL | full program |
 
 riscv-formal and the memory-port checks use bounded model checking: they show that no
@@ -71,20 +71,24 @@ fixed commit.
 
 ## Implementation
 
-### SKY130 (open-source flow)
+### SKY130 (LibreLane, GDSII)
 
-![RV32I-Alpha placed and routed in SKY130](assets/rv32i_sky130_layout.png)
+![RV32I-Alpha hardened in SKY130](assets/rv32i_sky130_layout.png)
 
-*(a) Standard-cell placement, register-file flip-flops in blue. (b) Signal wires on met1&ndash;met4.
-Drawn from the routed DEF by `asic/defplot.py`.*
+*(a) Standard-cell placement, register-file flip-flops in blue. (b) Signal wires on met1&ndash;met5
+and the power grid. Drawn from the final DEF by `asic/defplot.py`.*
 
-| Step | Result |
+| Item | Result |
 | :--- | :--- |
-| Synthesis (Yosys 0.62, sky130_fd_sc_hd, typical corner) | 4 696 cells, 59 557 &micro;m&sup2;; the register file is 992 flip-flops |
-| Placement and detailed routing (OpenROAD) | die 375.8 &times; 375.8 &micro;m (0.141 mm&sup2;), 47 % utilization, 234 mm of wire, 42 237 vias, no violations reported by the detailed router |
+| Flow | LibreLane 3.0.16, sky130_fd_sc_hd: synthesis, floorplan and power grid, placement, clock tree, timing repair, routing, parasitic extraction, sign-off |
+| Die | 466.9 &times; 477.6 &micro;m (0.223 mm&sup2;), 13 350 standard cells, 54 % utilization |
+| Physical sign-off | DRC clean (Magic and KLayout), LVS clean (Netgen), no antenna violations |
+| Timing at 40 MHz (25 ns) | setup met at the typical (+4.24 ns) and fast corners, **not met at the slow corner** (&minus;4.85 ns); hold met at every corner |
+| Power | 5.9 mW at 40 MHz, typical corner (default switching activity) |
 
-Not done yet: power grid, clock-tree synthesis, timing repair and timing closure, sign-off DRC
-and LVS, GDSII. The next step is a full LibreLane run. Commands and the source of each number:
+The input and output delays are the LibreLane defaults (20 % of the clock period on every port).
+The slow corner fails on the combinational paths from the instruction input through the execute
+stage to the data-memory outputs. Constraints, commands and the source of each number:
 [asic/README.md](asic/README.md).
 
 ### FPGA (Basys 3, XC7A35T-1, Vivado 2024.2)
@@ -119,7 +123,7 @@ and the last value written to a register on the four Pmod headers.
 | `rtl/core/` | SystemVerilog version of the core |
 | `tb/`, `asm/` | Testbench, torture test program and ROM generator |
 | `formal/` | riscv-formal configuration, memory-port properties, equivalence script |
-| `asic/` | SKY130 synthesis, place-and-route and plotting scripts |
+| `asic/` | LibreLane configuration, macro top level and layout plotting script |
 | `scripts/` | Simulation, Vivado build and synthesis estimate scripts |
 | `constraints/` | Basys 3 pin constraints |
 | `reports/` | Vivado reports of the current version |
@@ -130,7 +134,7 @@ After editing the torture test, regenerate the ROM with `python3 asm/build_rom.p
 
 ## Roadmap
 
-- Full LibreLane run: power grid, clock tree, sign-off timing, DRC and LVS, GDSII.
+- Close timing at the SKY130 slow corner (ss, 100 &deg;C, 1.60 V).
 - Close timing at 100 MHz on the board build (data-memory write-enable path).
 - The `rv32ui` tests from [riscv-tests](https://github.com/riscv-software-src/riscv-tests).
 
